@@ -312,12 +312,26 @@ a branch, each branched from `main`:
 | branch | what it does | found |
 | --- | --- | --- |
 | `cooperative-matrix` | measures `VK_KHR_cooperative_matrix` against the vector units, and a real GEMM against the instruction's ceiling | the matrix instruction is **46,471 GFLOP/s**, 3.4x this card's fp32 vector ceiling and 19% above what the same units gave through HIP's WMMA intrinsic |
+| `llama.cpp` | the same model and commit as the ROCm repository's HIP build, through the Vulkan backend | **14% faster generating** than HIP and 21% slower on prompts; cooperative matrix is worth **2.19x** on prompt processing and **nothing** on generation |
 
 Its working notes are `projects/cooperative-matrix/NOTES.md` on that branch.
 
 ## What has been measured
 
-On `main`, nothing. It proves the SDK works and does not measure the card.
+On `main`, nothing. It proves the SDK works and does not measure the card. The
+branches measure; this one, `llama.cpp`, runs a language model on the card —
+see [`projects/llama.cpp/NOTES.md`](projects/llama.cpp/NOTES.md).
+
+| run | pp512 | tg128 |
+| --- | ---: | ---: |
+| card, cooperative matrix | **1,609.08** t/s | 85.35 t/s |
+| card, cooperative matrix **off** | 736.26 t/s | **86.23** t/s |
+| processor — Ryzen 7 7700X | 825.22 t/s | 14.25 t/s |
+| the same card through HIP | 2,030.51 t/s | 74.70 t/s |
+
+Cooperative matrix is worth 2.19× on prompt processing and nothing on token
+generation. With it off, the card processes prompts more slowly than the
+processor does.
 
 Two full runs are recorded. [`samples/first-run.txt`](samples/first-run.txt)
 is the SDK already on the machine; [`samples/cold-install.txt`](samples/cold-install.txt)

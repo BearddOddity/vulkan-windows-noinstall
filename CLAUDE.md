@@ -30,6 +30,7 @@ ROCm repository:
 | branch | what it builds | measured |
 | --- | --- | --- |
 | `cooperative-matrix` | the matrix units through `VK_KHR_cooperative_matrix`, and a GEMM on top of them | 46,471 GFLOP/s for the instruction, 3.4x the fp32 vector ceiling; 19,206 GFLOP/s for a 2x2 blocked GEMM, 41% of it |
+| `llama.cpp` | llama.cpp against this SDK's Vulkan backend | 85.35 t/s generating and 1,609.08 processing, which is 1.14x and 0.79x of the same model through HIP; cooperative matrix worth 2.19x on prompts and nothing on generation |
 
 ---
 
@@ -449,7 +450,13 @@ opinion about the card. There is still no Vulkan equivalent of
 covers the card rather than one instruction, are both unwritten.
 
 The instruction ceilings and one GEMM are measured on the `cooperative-matrix`
-branch; see the table above and that branch's `projects/cooperative-matrix/NOTES.md`.
+branch, and one real workload on this one; see the table above,
+`projects/cooperative-matrix/NOTES.md` and `projects/llama.cpp/NOTES.md`.
+
+Two instruments on this branch lie if used carelessly, and both are documented
+where they are used: the machine must be idle before any figure is believed,
+and `GGML_VK_DISABLE_COOPMAT=0` disables cooperative matrix exactly as
+thoroughly as `=1` does, because ggml only checks whether the variable exists.
 Do not let this file imply anything beyond that has been measured.
 
 What is proven, on 2026-08-25:
