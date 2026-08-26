@@ -170,15 +170,106 @@ which is most of the wall clock. Outputs from this machine are in `samples/`.
 | **llama.cpp** | `2100e59` |
 | **Toolchain** | [`main`](../../tree/main) — Vulkan SDK 1.4.357.0 + MSVC 14.51 |
 
+## Where the 0.79× on prompt processing goes
+
+Answered, in three measurements.
+
+### 1. Three quarters of the time is one op
+
+`GGML_VK_PERF_LOGGER=1` prints every op in the graph with its own timing and,
+where it can, its rate. On the warm graph of a pp512 run
+(`samples/perf-pp512.txt`):
+
+| op | time | share |
+| --- | ---: | ---: |
+| `MUL_MAT` (seven shapes) | 261.7 ms | **74%** |
+| `FLASH_ATTN_EXT` | 43.7 ms | 12% |
+| `RMS_NORM_MUL_ROPE` | 22.7 ms | 6% |
+| `GLU` | 8.5 ms | 2% |
+| `ADD` | 5.8 ms | 2% |
+| everything else | ~13 ms | 4% |
+
+Weighted across those seven shapes, ggml's Vulkan matmul runs at
+**13,920 GFLOP/s**. The individual shapes range from 11,102 to 14,684.
+
+So the deficit is in the matmul, not in the surrounding ops, and not in the
+instruction: the [`cooperative-matrix`](../../tree/cooperative-matrix) branch
+measured `coopMatMulAdd` itself at 46,471 GFLOP/s.
+
+### 2. What the matmul would have to reach
+
+Holding everything else fixed, closing the 1.26× end-to-end gap means doing the
+same matmul work in 188 ms instead of 262 — that is **19,375 GFLOP/s**.
+
+The same branch measured a 2×2 register-blocked cooperative-matrix GEMM,
+fp16 in and fp32 out, at **19,206 GFLOP/s**.
+
+> HIP's effective matmul rate on this model is, to within 1%, what a
+> well-blocked cooperative-matrix GEMM gets on this card. ggml's Vulkan matmul
+> is at **72% of that**, while also dequantizing Q4_K on the way in. There is
+> no missing hardware in this story — the whole gap is one kernel's efficiency.
+
+### 3. The obvious lever is already pulled, in the other direction
+
+ggml has three matmul tile sizes and picks between them at run time. On this
+card it only ever used the medium one, which looked like the answer:
+
+```cpp
+case VK_VENDOR_ID_AMD:
+    device->mul_mat_l[i] = device->coopmat_support && device->driver_id != vk::DriverId::eAmdProprietary;
+```
+
+**The large tile is disabled by driver name**, and this is AMD's proprietary
+Windows driver. A second AMD tuning path — the flash-attention occupancy
+limiter — is gated on `maxComputeSharedMemorySize == 65536`, and this driver
+reports **32768** where RADV reports 65536, so that one is skipped too. Two
+AMD-specific tunings, both off, on the driver this repository runs.
+
+So the patch is one word. It was applied, built into a separate tree, and
+measured:
+
+| | pp512 | tg128 |
+| --- | ---: | ---: |
+| stock — medium tile | **1,609.08 t/s** | **85.35 t/s** |
+| patched — large tile allowed | 419.30 t/s | 73.80 t/s |
+
+> **Enabling the large tile makes prompt processing 3.8× slower.** The gate is
+> not an oversight. It is load-bearing, and the hypothesis this branch started
+> with was wrong.
+
+`GGML_VK_PIPELINE_STATS` says why, in the numbers the driver reports for each
+compiled pipeline:
+
+| pipeline | VGPRs | LDS used | scratch |
+| --- | ---: | ---: | ---: |
+| `matmul_q4_k_f32_f16acc_aligned_m` | 113 | 11,264 B | **0** |
+| `matmul_q4_k_f32_f16acc_aligned_l` | 168 | 21,504 B | **1,056 B** |
+
+168 VGPRs on RDNA3 leaves room for one wave per SIMD where 113 leaves two, and
+the large tile **spills 1,056 bytes to scratch** on top of that. Half the
+occupancy and a trip to memory in the inner loop.
+
+### What that leaves
+
+The gap is ggml's Vulkan matmul being 28% off what this card can do on fetched
+fp16 work, and it cannot be closed by making the tile bigger, because the
+register file is already the binding constraint at 113 VGPRs. Closing it means
+a kernel that gets more arithmetic per register — which is what the
+cooperative-matrix branch's blocked GEMM does, and it is not quantized.
+
+Two smaller things were noticed and not chased:
+
+- `FLASH_ATTN_EXT` took **432 µs per call in one run and 1,214 µs in another**,
+  both warm, otherwise identical. Its share of the graph is somewhere between
+  5% and 12% and this branch does not know why it moves.
+- The first graph of every run is about 10% slower than the last, with flash
+  attention worst affected. The clock ramp, again, and the reason the numbers
+  quoted here come from the last graph.
+
 ## Open
 
-- **The 0.79× on prompt processing is unexplained.** The
-  [`cooperative-matrix`](../../tree/cooperative-matrix) branch measured the
-  instruction itself as *faster* through Vulkan than through HIP — 46,471
-  against 39,077 GFLOP/s — so the deficit is above the instruction, in ggml's
-  Vulkan matmul or in how it feeds it. That branch also found that a naive
-  cooperative-matrix GEMM reaches 11% of the ceiling and a 2×2 blocked one 41%,
-  which is the right order of magnitude for the gap.
+- **The 0.79× on prompt processing is explained above** — what remains is
+  whether ggml's Vulkan matmul can be made to reach 19 TFLOP/s at 113 VGPRs.
 - **Token generation is memory-bound and neither API is close to the bus.**
   Nothing here measures bandwidth, so how much of the 14% Vulkan lead is the
   memory path rather than the kernels is not known.

@@ -453,6 +453,13 @@ The instruction ceilings and one GEMM are measured on the `cooperative-matrix`
 branch, and one real workload on this one; see the table above,
 `projects/cooperative-matrix/NOTES.md` and `projects/llama.cpp/NOTES.md`.
 
+That branch also explains its own 0.79x against HIP on prompt processing: 74%
+of the time is MUL_MAT at 13,920 GFLOP/s where 19,375 would match HIP, and the
+obvious lever - ggml's large matmul tile - is disabled on this driver by name
+and makes prompt processing 3.8x *worse* when forced on, because that tile
+needs 168 VGPRs and spills 1,056 bytes to scratch where the medium one needs
+113 and spills none.
+
 Two instruments on this branch lie if used carelessly, and both are documented
 where they are used: the machine must be idle before any figure is believed,
 and `GGML_VK_DISABLE_COOPMAT=0` disables cooperative matrix exactly as

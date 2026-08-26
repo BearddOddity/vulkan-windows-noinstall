@@ -1,0 +1,53 @@
+# GGML_VK_PERF_LOGGER=1, pp512, Qwen3-4B-Instruct-2507 Q4_K_M, RX 7600 XT
+# 4 graphs in the run. The last one is what the numbers in NOTES.md come
+# from; the first is kept beside it because it is 10% slower overall, which
+# is the clock ramp again.
+
+== LAST GRAPH ==
+
+ADD: 71 x 81.105 us = 5758.48 us
+FLASH_ATTN_EXT dst(128,32,512,1),  q(128,512,32,1),  k(128,512,8,1),  v(128,512,8,1),  m(512,512,1,1): 36 x 1212.67 us = 43656.2 us (3541.74 GFLOPS/s)
+GET_ROWS: 2 x 3.98 us = 7.96 us
+GLU: 36 x 237.045 us = 8533.64 us
+MUL_MAT q4_K m=1024 n=512 k=2560: 54 x 202.417 us = 10930.6 us (13258.9 GFLOPS/s)
+MUL_MAT q4_K m=2560 n=512 k=4096: 36 x 689.347 us = 24816.5 us (15574.3 GFLOPS/s)
+MUL_MAT q4_K m=2560 n=512 k=9728: 18 x 1851.21 us = 33321.9 us (13774.8 GFLOPS/s)
+MUL_MAT q4_K m=4096 n=512 k=2560: 36 x 761.756 us = 27423.2 us (14092.8 GFLOPS/s)
+MUL_MAT q4_K m=9728 n=512 k=2560: 70 x 1740.22 us = 121815 us (14651.3 GFLOPS/s)
+MUL_MAT q6_K m=1024 n=512 k=2560: 18 x 215.828 us = 3884.92 us (12435 GFLOPS/s)
+MUL_MAT q6_K m=2560 n=512 k=9728: 17 x 2326.31 us = 39547.2 us (10961.6 GFLOPS/s)
+MUL_MAT_ADD MUL_MAT_VEC q6_K m=2560 n=1 k=9728: 1 x 89 us = 89 us (559.604 GFLOPS/s)
+MUL_MAT_VEC q4_K m=9728 n=1 k=2560: 2 x 72.84 us = 145.68 us (683.658 GFLOPS/s)
+MUL_MAT_VEC q6_K m=151936 n=1 k=2560: 1 x 1217.88 us = 1217.88 us (638.618 GFLOPS/s)
+RMS_NORM_MUL RMS_NORM(2560,1,1,1): 2 x 5.56 us = 11.12 us
+RMS_NORM_MUL RMS_NORM(2560,512,1,1): 71 x 36.213 us = 2571.16 us
+RMS_NORM_MUL_ROPE RMS_NORM(128,32,512,1): 36 x 631.111 us = 22720 us
+RMS_NORM_MUL_ROPE_VIEW_SET_ROWS RMS_NORM(128,8,512,1): 36 x 171.626 us = 6178.56 us
+SET_ROWS: 36 x 86.724 us = 3122.08 us
+Total time: 355751 us.
+| qwen3 4B Q4_K - Medium         |   2.32 GiB |     4.02 B | Vulkan     |  99 |           pp512 |      1379.28 ± 35.36 |
+
+build: 2100e59 (1)
+
+== FIRST GRAPH, cold ==
+
+ADD: 71 x 83.457 us = 5925.48 us
+FLASH_ATTN_EXT dst(128,32,512,1),  q(128,512,32,1),  k(128,512,8,1),  v(128,512,8,1),  m(512,512,1,1): 36 x 1120.35 us = 40332.6 us (3833.6 GFLOPS/s)
+GET_ROWS: 2 x 2.6 us = 5.2 us
+GLU: 36 x 295.87 us = 10651.3 us
+MUL_MAT q4_K m=1024 n=512 k=2560: 54 x 240.437 us = 12983.6 us (11162.3 GFLOPS/s)
+MUL_MAT q4_K m=2560 n=512 k=4096: 36 x 1052.6 us = 37893.4 us (10199.7 GFLOPS/s)
+MUL_MAT q4_K m=2560 n=512 k=9728: 18 x 1807.21 us = 32529.7 us (14110.2 GFLOPS/s)
+MUL_MAT q4_K m=4096 n=512 k=2560: 36 x 907.433 us = 32667.6 us (11830.4 GFLOPS/s)
+MUL_MAT q4_K m=9728 n=512 k=2560: 70 x 1856.23 us = 129936 us (13735.6 GFLOPS/s)
+MUL_MAT q6_K m=1024 n=512 k=2560: 18 x 253.655 us = 4565.8 us (10580.6 GFLOPS/s)
+MUL_MAT q6_K m=2560 n=512 k=9728: 17 x 2329.98 us = 39609.7 us (10944.3 GFLOPS/s)
+MUL_MAT_ADD MUL_MAT_VEC q6_K m=2560 n=1 k=9728: 1 x 89.12 us = 89.12 us (558.851 GFLOPS/s)
+MUL_MAT_VEC q4_K m=9728 n=1 k=2560: 2 x 1050.32 us = 2100.64 us (47.4119 GFLOPS/s)
+MUL_MAT_VEC q6_K m=151936 n=1 k=2560: 1 x 1229.32 us = 1229.32 us (632.675 GFLOPS/s)
+RMS_NORM_MUL RMS_NORM(2560,1,1,1): 2 x 6.14 us = 12.28 us
+RMS_NORM_MUL RMS_NORM(2560,512,1,1): 71 x 38.496 us = 2733.28 us
+RMS_NORM_MUL_ROPE RMS_NORM(128,32,512,1): 36 x 616.753 us = 22203.1 us
+RMS_NORM_MUL_ROPE_VIEW_SET_ROWS RMS_NORM(128,8,512,1): 36 x 182.167 us = 6558.04 us
+SET_ROWS: 36 x 86.501 us = 3114.04 us
+Total time: 385140 us.

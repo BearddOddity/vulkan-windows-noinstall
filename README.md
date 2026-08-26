@@ -333,6 +333,15 @@ Cooperative matrix is worth 2.19× on prompt processing and nothing on token
 generation. With it off, the card processes prompts more slowly than the
 processor does.
 
+**Where the 0.79× on prompt processing goes**: 74% of the time is `MUL_MAT`,
+running at 13,920 GFLOP/s. To match HIP it would need 19,375 — which is, to
+within 1%, what a 2×2 blocked cooperative-matrix GEMM reaches on this card. The
+instruction is not the limit; one kernel's efficiency is. And the obvious fix is
+already ruled out: ggml disables its large matmul tile on this driver by name,
+and enabling it makes prompt processing **3.8× slower**, because that tile needs
+168 VGPRs and spills 1,056 bytes to scratch where the medium one needs 113 and
+spills none.
+
 Two full runs are recorded. [`samples/first-run.txt`](samples/first-run.txt)
 is the SDK already on the machine; [`samples/cold-install.txt`](samples/cold-install.txt)
 is one installed from nothing, before and after trimming. On 2026-08-25:
