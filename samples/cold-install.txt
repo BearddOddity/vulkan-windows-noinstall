@@ -1,0 +1,148 @@
+# Cold install, 2026-08-25
+#
+# A machine that already had an SDK at C:\VulkanSDK\1.4.357.0 was used to
+# install a second, independent copy to D:\vk-cold\1.4.357.0 from nothing, to
+# prove scripts\get_vulkan_sdk.ps1 against a real installer rather than
+# against a tree the wizard had already made.
+#
+# The three failures below happened in this order and each cost a run. The
+# script now handles all three; they are kept here because the messages are
+# what you would search for.
+
+
+## 1. The flags that cannot be used together
+
+$ vulkansdk-windows-X64-1.4.357.0.exe --root D:\vk-cold\1.4.357.0
+      --accept-licenses --accept-messages --default-answer --confirm-command
+      install com.lunarg.vulkan com.lunarg.vulkan.core
+
+  [ ... a screen and a half of --help ... ]
+  The following options are mutually exclusive: accept-messages, default-answer.
+
+  exit 1
+
+Printed as the last line after the whole of --help, with nothing that reads
+like an error before it. --default-answer is the one to keep.
+
+
+## 2. The install that runs for 45 seconds and then undoes itself
+
+$ vulkansdk-windows-X64-1.4.357.0.exe --root D:\vk-cold\1.4.357.0
+      --accept-licenses --default-answer --confirm-command
+      install com.lunarg.vulkan com.lunarg.vulkan.core
+
+  [43635] Installing component The Vulkan SDK Core (Always Installed)
+  [43635] installationError : Error : Cannot elevate access rights while
+          running from command line. Please restart the application as
+          administrator.
+  [43635] Answer: "NoButton"
+  [43635] ROLLING BACK operations= 26
+  [44222] Installation aborted!
+
+  exit 1
+
+Every archive extracts first, so it looks like a working install until the
+component script asks for rights it cannot get. There is no flag that skips
+the elevated work - it registers the layer manifests under HKLM and runs the
+bundled VC_redist. --auto-answer does not help either:
+
+  [54834] Invalid answer "Ignore" for "installationError". Using default
+          value "NoButton" instead.
+
+The query offers no buttons, so there is no answer that continues.
+
+
+## 3. The component list that is not a component list
+
+$ scripts\get_vulkan_sdk.ps1 -Installer ... -Dest D:\vk-cold\1.4.357.0
+
+  installing to D:\vk-cold\1.4.357.0
+  packages: com.lunarg.vulkan, com.lunarg.vulkan.core
+  not elevated - relaunching the installer through UAC; approve the prompt
+  installer output: C:\Users\OddTower\AppData\Local\Temp\vulkansdk-install.log
+
+and in that log, with --no-default-installations on the command line:
+
+  [497] Selected components without dependencies:
+  com.lunarg.vulkan
+  com.lunarg.vulkan.core
+  com.lunarg.vulkan.glm
+  com.lunarg.vulkan.sdl2
+  com.lunarg.vulkan.volk
+  com.lunarg.vulkan.debug
+  com.lunarg.vulkan.vma
+  com.lunarg.vulkan.arm64
+  [497] Installation space required: "4.99 GB"
+  ...
+  [48762] Installing component The Vulkan SDK
+  [48764] Installing component The Vulkan SDK Core (Always Installed)
+  [50487] Installing component Shader Toolchain Debug Symbols - 64-bit
+  [50639] Installation finished!
+
+Two of the eight were asked for. Naming packages adds to LunarG's default
+selection rather than replacing it, and --no-default-installations does not
+deselect them either.
+
+
+## What the script does about it
+
+  installed, 4.97 GB
+  removing components that were installed without being asked for:
+    com.lunarg.vulkan.debug
+    com.lunarg.vulkan.sdl2
+    com.lunarg.vulkan.glm
+    com.lunarg.vulkan.vma
+    com.lunarg.vulkan.volk
+    com.lunarg.vulkan.arm64
+  [349] Components uninstalled successfully
+
+  4.97 GB -> 1.70 GB, and components.xml now lists com.lunarg.vulkan and
+  com.lunarg.vulkan.core alone. That is byte for byte the size of the wizard's
+  core-only install on C:.
+
+  The removal took 0.4 seconds and needed no elevation. Only the install does.
+
+
+## The cold tree, proved
+
+$ scripts\verify.ps1 -Sdk D:\vk-cold\1.4.357.0
+
+  Vulkan SDK  1.4.357.0  (D:\vk-cold\1.4.357.0)
+  MSVC        14.51.36231
+  devices     AMD Radeon RX 7600 XT | AMD Radeon(TM) Graphics
+
+  ok    no space in the SDK path - clean
+  ok    shader toolchain - shaderc v2026.3 v2026.3
+  ok    headers and import library - VK_HEADER_VERSION 357
+  ok    loader - 1.4.357.0
+  ok    validation layer discoverable - enumerated
+  ok    Radeon RX 7600 XT present - index 0 of 2
+  ok    MSVC on the environment - Version 19.51.36252 for x64
+
+  all passed
+
+$ scripts\smoke_test.ps1 -Sdk D:\vk-cold\1.4.357.0
+
+  1176 bytes of SPIR-V, valid
+  AMD Radeon RX 7600 XT: 1024 elements, all correct, validation clean
+
+Both were run twice: once on the 4.97 GB tree and again after trimming to
+1.70 GB. Identical. Nothing outside the core is needed to compile a shader,
+validate it, link a host program and dispatch it.
+
+
+## What the install did to the machine, which is the part to watch
+
+Before, HKLM\SOFTWARE\Khronos\Vulkan\ExplicitLayers held nine manifests under
+C:\VulkanSDK\1.4.357.0\Bin. After the cold install it held nine under
+D:\vk-cold\1.4.357.0\Bin and none under C:.
+
+The second SDK did not add itself alongside the first. It **repointed every
+explicit layer entry at itself**, and the first SDK's layers stopped being
+discoverable - silently, with both trees still on disk and both looking
+complete. vkenv.ps1 survives this only because it checks whether the
+validation layer is enumerable before deciding to set VK_ADD_LAYER_PATH.
+
+`maintenancetool.exe purge` removed the tree and left the registry with nine
+entries pointing at files that no longer existed; the C: entries were not
+restored. They were put back by hand.
