@@ -1,0 +1,20 @@
+#version 450
+
+// Deliberately the smallest kernel that can be wrong in a visible way:
+// element-wise add over the length of the output buffer. A shader that
+// silently does nothing leaves that buffer at its initial value, which the
+// host checks for rather than printing.
+
+layout(local_size_x = 256) in;
+
+layout(std430, binding = 0) readonly  buffer A   { float a[]; };
+layout(std430, binding = 1) readonly  buffer B   { float b[]; };
+layout(std430, binding = 2) writeonly buffer Out { float c[]; };
+
+void main() {
+    uint i = gl_GlobalInvocationID.x;
+    // c.length() rather than a pushed constant: std430 runtime arrays carry
+    // their size, so there is one fewer thing for the host and the shader to
+    // disagree about.
+    if (i < c.length()) c[i] = a[i] + b[i];
+}

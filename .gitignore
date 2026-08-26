@@ -1,0 +1,10 @@
+# Nothing licensed to somebody else goes in here. The scripts fetch the SDK
+# from LunarG; the repository holds the recipe, never the payload.
+vulkansdk/
+VulkanSDK/
+sdk-extract/
+*.exe
+*.msi
+*.spv
+build/
+out/

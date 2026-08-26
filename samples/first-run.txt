@@ -1,0 +1,52 @@
+# scripts\verify.ps1
+
+Vulkan SDK  1.4.357.0  (C:\VulkanSDK\1.4.357.0)
+MSVC        14.51.36231
+devices     AMD Radeon RX 7600 XT | AMD Radeon(TM) Graphics
+
+ok    no space in the SDK path - clean
+ok    shader toolchain - shaderc v2026.3 v2026.3
+ok    headers and import library - VK_HEADER_VERSION 357
+ok    loader - 1.4.357.0
+ok    validation layer discoverable - enumerated
+ok    Radeon RX 7600 XT present - index 0 of 2
+ok    MSVC on the environment - Microsoft (R) C/C++ Optimizing Compiler Version 19.51.36252 for x64
+
+note  third-party layers - 10 injected by things other than the SDK:
+        GalaxyOverlayVkLayer
+        GalaxyOverlayVkLayer_DEBUG
+        GalaxyOverlayVkLayer_VERBOSE
+        VK_LAYER_AMD_switchable_graphics
+        VK_LAYER_EOS_Overlay
+        VK_LAYER_OBS_HOOK
+        VK_LAYER_ROCKSTAR_GAMES_social_club
+        VK_LAYER_VALVE_steam_fossilize
+        VK_LAYER_VALVE_steam_overlay
+        VK_LAYER_WEOBS_HOOK
+        These load into every Vulkan process. Disable them before believing a
+        capture, a hang, or a frame time. VK_LOADER_LAYERS_DISABLE=* turns the lot off.
+
+all passed
+
+# scripts\smoke_test.ps1
+
+Vulkan SDK  1.4.357.0  (C:\VulkanSDK\1.4.357.0)
+MSVC        14.51.36231
+devices     AMD Radeon RX 7600 XT | AMD Radeon(TM) Graphics
+
+=== compiling the shader ===
+1176 bytes of SPIR-V, valid
+
+=== compiling the host program ===
+smoke_test.cpp
+
+=== running on Radeon RX 7600 XT ===
+validation: Layer name GalaxyOverlayVkLayer does not conform to naming standard (Policy #LLP_LAYER_3)
+validation: Layer name GalaxyOverlayVkLayer_VERBOSE does not conform to naming standard (Policy #LLP_LAYER_3)
+validation: Layer name GalaxyOverlayVkLayer_DEBUG does not conform to naming standard (Policy #LLP_LAYER_3)
+validation: Removing layer VK_LAYER_AMD_switchable_graphics (C:\WINDOWS\System32\DriverStore\FileRepository\amdvlk.inf_amd64_914ba89eaaafdf60\amd-vulkan64.json) because it is a duplicate of VK_LAYER_AMD_switchable_graphics (C:\WINDOWS\System32\DriverStore\FileRepository\u0203303.inf_amd64_e5876a26758f154c\B026363\amd-vulkan64.json)
+validation: Removing layer VK_LAYER_OBS_HOOK (C:\ProgramData\obs-studio-hook\obs-vulkan64.json) because it is a duplicate of VK_LAYER_OBS_HOOK (C:\ProgramData\lovense-obs-studio-hook\obs-vulkan64.json)
+validation: Removing layer VK_LAYER_WEOBS_HOOK (C:\ProgramData\obs-studio-hook\we-obs-vulkan32.json) because it is a duplicate of VK_LAYER_WEOBS_HOOK (C:\ProgramData\obs-studio-hook\we-obs-vulkan64.json)
+AMD Radeon RX 7600 XT: 1024 elements, all correct, validation clean
+
+smoke test passed - this SDK compiles a shader, validates it, and runs it on the card
