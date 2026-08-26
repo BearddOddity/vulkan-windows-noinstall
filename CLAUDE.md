@@ -30,7 +30,7 @@ ROCm repository:
 | branch | what it builds | measured |
 | --- | --- | --- |
 | `cooperative-matrix` | the matrix units through `VK_KHR_cooperative_matrix`, and a GEMM on top of them | 46,471 GFLOP/s for the instruction, 3.4x the fp32 vector ceiling; 19,206 GFLOP/s for a 2x2 blocked GEMM, 41% of it |
-| `llama.cpp` | llama.cpp against this SDK's Vulkan backend | 85.35 t/s generating, 1.14x of HIP; 1,609.08 processing, 0.79x of HIP; cooperative matrix worth 2.19x on prompts and nothing on generation |
+| `llama.cpp` | llama.cpp against this SDK's Vulkan backend | 85.35 t/s generating, 1.14x of HIP; 1,609.08 processing, 0.79x of HIP; cooperative matrix worth 2.19x on prompts and nothing on generation. The 0.79x is ggml's Vulkan matmul at 72% of what a blocked coopmat GEMM gets; the large tile is disabled on this driver by name and is 3.8x worse when forced on |
 
 ---
 

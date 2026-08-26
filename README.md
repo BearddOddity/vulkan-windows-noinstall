@@ -312,7 +312,7 @@ a branch, each branched from `main`:
 | branch | what it does | found |
 | --- | --- | --- |
 | `cooperative-matrix` | measures `VK_KHR_cooperative_matrix` against the vector units, and a real GEMM against the instruction's ceiling | the matrix instruction is **46,471 GFLOP/s**, 3.4x this card's fp32 vector ceiling and 19% above what the same units gave through HIP's WMMA intrinsic |
-| `llama.cpp` | a language model on the Vulkan backend, against the ROCm repository's HIP numbers for the same model and card | **14% faster generating** than HIP, 21% slower on prompts; cooperative matrix is worth **2.19x** on prompt processing and **nothing** on generation |
+| `llama.cpp` | a language model on the Vulkan backend, against the ROCm repository's HIP numbers for the same model and card | **14% faster generating** than HIP, 21% slower on prompts; cooperative matrix is worth **2.19x** on prompt processing and **nothing** on generation. The 21% is one kernel: 74% of prompt processing is `MUL_MAT` at 13,920 GFLOP/s where 19,375 would match HIP |
 
 Its working notes are `projects/cooperative-matrix/NOTES.md` on that branch.
 
