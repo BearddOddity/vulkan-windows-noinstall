@@ -1,0 +1,23 @@
+AMD Radeon RX 7600 XT, driver 2.0.395, API 1.4.349
+
+VK_KHR_cooperative_matrix  present  (of 220 device extensions)
+cooperativeMatrix                   = true
+cooperativeMatrixRobustBufferAccess = true
+supported stages                    = 0x00000020 (compute)
+
+subgroupSize 64, min 32, max 64
+
+11 supported shapes
+
+  MxNxK        A       B       C       result  scope      saturating
+  16x16x16     fp16    fp16    fp32    fp32    subgroup   no
+  16x16x16     fp16    fp16    fp16    fp16    subgroup   no
+  16x16x16     fp16    fp16    fp16    fp16    subgroup   yes
+  16x16x16     uint8   uint8   sint32  sint32  subgroup   no
+  16x16x16     uint8   uint8   sint32  sint32  subgroup   yes
+  16x16x16     uint8   sint8   sint32  sint32  subgroup   no
+  16x16x16     uint8   sint8   sint32  sint32  subgroup   yes
+  16x16x16     sint8   uint8   sint32  sint32  subgroup   no
+  16x16x16     sint8   uint8   sint32  sint32  subgroup   yes
+  16x16x16     sint8   sint8   sint32  sint32  subgroup   no
+  16x16x16     sint8   sint8   sint32  sint32  subgroup   yes

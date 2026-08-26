@@ -1,0 +1,49 @@
+#version 450
+#extension GL_KHR_cooperative_matrix        : require
+#extension GL_KHR_memory_scope_semantics    : require
+#extension GL_KHR_shader_subgroup_basic     : require
+#extension GL_EXT_shader_explicit_arithmetic_types_float16 : require
+#extension GL_EXT_shader_16bit_storage      : require
+
+// A real matrix multiply, so the ceiling measured next door has something to
+// be compared against: C = A*B, fp16 in, fp32 out, row major throughout.
+//
+// The ceiling kernel never touches memory. This one does nothing else - every
+// tile of A and B is read from device memory, once per output tile that needs
+// it, with no staging through shared memory at all. That is deliberately the
+// simplest thing that works, because the question here is what a
+// straightforward cooperative-matrix GEMM gets, not what a tuned one does.
+//
+// One subgroup owns one 16x16 tile of C. Four subgroups per workgroup, side by
+// side along N.
+
+layout(local_size_x = 128) in;
+
+layout(std430, binding = 0) readonly  buffer BufA { float16_t A[]; };
+layout(std430, binding = 1) readonly  buffer BufB { float16_t B[]; };
+layout(std430, binding = 2) writeonly buffer BufC { float     C[]; };
+
+layout(push_constant) uniform Push { uint M, N, K; } pc;
+
+void main()
+{
+    uint tileN = gl_WorkGroupID.x * gl_NumSubgroups + gl_SubgroupID;
+    uint tileM = gl_WorkGroupID.y;
+
+    coopmat<float, gl_ScopeSubgroup, 16, 16, gl_MatrixUseAccumulator> acc =
+        coopmat<float, gl_ScopeSubgroup, 16, 16, gl_MatrixUseAccumulator>(0.0);
+
+    for (uint k = 0u; k < pc.K; k += 16u) {
+        coopmat<float16_t, gl_ScopeSubgroup, 16, 16, gl_MatrixUseA> a;
+        coopmat<float16_t, gl_ScopeSubgroup, 16, 16, gl_MatrixUseB> b;
+
+        // The offset is in elements, not bytes, and the stride is the row
+        // length of the whole matrix rather than of the tile.
+        coopMatLoad(a, A, tileM * 16u * pc.K + k,        pc.K, gl_CooperativeMatrixLayoutRowMajor);
+        coopMatLoad(b, B, k * pc.N + tileN * 16u,        pc.N, gl_CooperativeMatrixLayoutRowMajor);
+
+        acc = coopMatMulAdd(a, b, acc);
+    }
+
+    coopMatStore(acc, C, tileM * 16u * pc.N + tileN * 16u, pc.N, gl_CooperativeMatrixLayoutRowMajor);
+}

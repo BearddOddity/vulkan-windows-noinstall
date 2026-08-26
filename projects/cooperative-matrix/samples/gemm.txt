@@ -1,0 +1,8 @@
+AMD Radeon RX 7600 XT, driver 2.0.395
+C = A*B, 2048x2048x2048, fp16 in, fp32 accumulate, device-local operands
+16.8 MB in, 16.8 MB out, 17.18 GFLOP of arithmetic
+
+  kernel                         ms      GFLOP/s worst rel. err
+  cooperative matrix          3.383         5079       0.00e+00
+  coopmat, 2x2 blocked        0.895        19206       0.00e+00
+  scalar                     17.671          972       0.00e+00

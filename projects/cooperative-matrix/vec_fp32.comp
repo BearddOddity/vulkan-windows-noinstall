@@ -1,0 +1,43 @@
+#version 450
+
+// The fp32 vector ceiling: what one lane can do with no memory traffic.
+//
+// Eight independent chains, because a single chain measures the instruction's
+// latency rather than its throughput - every issue waits on the one before it.
+// Each chain starts from a different runtime value, which is not decoration:
+// seeded identically they are eight identical computations over identical
+// operands and the compiler keeps one.
+
+layout(local_size_x = 256) in;
+
+layout(std430, binding = 0) readonly  buffer In  { float seed[]; };
+layout(std430, binding = 1) writeonly buffer Out { float result[]; };
+
+layout(push_constant) uniform Push { uint iters; } pc;
+
+void main()
+{
+    // A runtime value, so nothing here can be constant folded away.
+    float s = seed[gl_LocalInvocationID.x & 63u];
+
+    float a0 = s,       a1 = s + 1.0, a2 = s + 2.0, a3 = s + 3.0;
+    float a4 = s + 4.0, a5 = s + 5.0, a6 = s + 6.0, a7 = s + 7.0;
+
+    // Scaled so the chains neither overflow nor flush to zero over a long
+    // loop. Denormals would be measuring the slow path instead.
+    float m = 1.0 + s * 1.0e-7;
+    float b = s * 1.0e-7;
+
+    for (uint i = 0u; i < pc.iters; ++i) {
+        a0 = fma(a0, m, b);
+        a1 = fma(a1, m, b);
+        a2 = fma(a2, m, b);
+        a3 = fma(a3, m, b);
+        a4 = fma(a4, m, b);
+        a5 = fma(a5, m, b);
+        a6 = fma(a6, m, b);
+        a7 = fma(a7, m, b);
+    }
+
+    result[gl_GlobalInvocationID.x] = a0 + a1 + a2 + a3 + a4 + a5 + a6 + a7;
+}

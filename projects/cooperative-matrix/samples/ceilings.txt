@@ -1,0 +1,34 @@
+AMD Radeon RX 7600 XT, driver 2.0.395
+131072 threads (512 workgroups of 256), timestampPeriod 10.0 ns
+
+  kernel                            iters           ms        GFLOP/s
+  fp32 vector FMA                     256        0.046          11712
+                                     1024        0.170          12638
+                                     4096        0.664          12943
+                                    16384        2.496          13765
+                                    65536       10.351          13278
+
+  fp16 packed FMA                     256        0.052          20633
+                                     1024        0.201          21364
+                                     4096        0.803          21404
+                                    16384        3.262          21065
+                                    65536       12.965          21202
+
+  coopmat 16x16x16, wave32            256        0.766          44851
+                                     1024        2.996          45870
+                                     4096       11.906          46173
+                                    16384       47.320          46471
+                                    65536      189.766          46352
+
+  coopmat 16x16x16, wave64            256        0.373          46029
+                                     1024        1.481          46392
+                                     4096        5.933          46332
+                                    16384       23.717          46359
+                                    65536       94.890          46349
+
+best of each, and the ratio that is the point of this branch:
+
+  fp32 vector FMA                   13765 GFLOP/s    1.00x fp32 vector
+  fp16 packed FMA                   21404 GFLOP/s    1.55x fp32 vector
+  coopmat 16x16x16, wave32          46471 GFLOP/s    3.38x fp32 vector
+  coopmat 16x16x16, wave64          46392 GFLOP/s    3.37x fp32 vector

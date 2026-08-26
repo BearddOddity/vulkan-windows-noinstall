@@ -1,0 +1,65 @@
+#version 450
+#extension GL_KHR_cooperative_matrix         : require
+#extension GL_KHR_memory_scope_semantics     : require
+#extension GL_EXT_shader_explicit_arithmetic_types_float16 : require
+
+// The cooperative matrix ceiling, in the same shape as the two vector kernels
+// so the three numbers can be divided by one another.
+//
+// The unit of work is different in kind. The vector kernels do arithmetic per
+// lane; this does one 16x16x16 matrix multiply-accumulate for a whole
+// subgroup at a time - 16*16*16 multiply-adds, 8192 flops, from one
+// coopMatMulAdd.
+//
+// 16x16x16 with fp16 in and fp32 accumulate is the first of the eleven shapes
+// this driver publishes. Nothing else is instantiable: a shader may only name
+// a shape the implementation lists, and asking for 32x32x8 is a compile error
+// rather than a slow path.
+//
+// Four accumulators for the same reason the vector kernels have eight, and
+// seeded differently for the same reason - four identical chains over
+// identical operands collapse to one.
+
+layout(local_size_x = 256) in;
+
+layout(std430, binding = 0) readonly  buffer In  { float seed[]; };
+layout(std430, binding = 1) writeonly buffer Out { float result[]; };
+
+layout(push_constant) uniform Push { uint iters; } pc;
+
+void main()
+{
+    float16_t s = float16_t(seed[0]);
+
+    // Constructed from a runtime scalar, which broadcasts to every element.
+    // The operands never leave the register file: nothing in the loop touches
+    // memory, so what is measured is the instruction and not the path to it.
+    coopmat<float16_t, gl_ScopeSubgroup, 16, 16, gl_MatrixUseA> a =
+        coopmat<float16_t, gl_ScopeSubgroup, 16, 16, gl_MatrixUseA>(s * float16_t(1.0e-2));
+    coopmat<float16_t, gl_ScopeSubgroup, 16, 16, gl_MatrixUseB> b =
+        coopmat<float16_t, gl_ScopeSubgroup, 16, 16, gl_MatrixUseB>(s * float16_t(1.0e-2));
+
+    coopmat<float, gl_ScopeSubgroup, 16, 16, gl_MatrixUseAccumulator> c0 =
+        coopmat<float, gl_ScopeSubgroup, 16, 16, gl_MatrixUseAccumulator>(float(s));
+    coopmat<float, gl_ScopeSubgroup, 16, 16, gl_MatrixUseAccumulator> c1 =
+        coopmat<float, gl_ScopeSubgroup, 16, 16, gl_MatrixUseAccumulator>(float(s) + 1.0);
+    coopmat<float, gl_ScopeSubgroup, 16, 16, gl_MatrixUseAccumulator> c2 =
+        coopmat<float, gl_ScopeSubgroup, 16, 16, gl_MatrixUseAccumulator>(float(s) + 2.0);
+    coopmat<float, gl_ScopeSubgroup, 16, 16, gl_MatrixUseAccumulator> c3 =
+        coopmat<float, gl_ScopeSubgroup, 16, 16, gl_MatrixUseAccumulator>(float(s) + 3.0);
+
+    for (uint i = 0u; i < pc.iters; ++i) {
+        c0 = coopMatMulAdd(a, b, c0);
+        c1 = coopMatMulAdd(a, b, c1);
+        c2 = coopMatMulAdd(a, b, c2);
+        c3 = coopMatMulAdd(a, b, c3);
+    }
+
+    // One element per accumulator is enough to keep the chain alive. Which
+    // lane holds which element is the implementation's business; length() is
+    // how many this lane got.
+    float sum = 0.0;
+    for (uint i = 0u; i < c0.length(); ++i) sum += c0[i] + c1[i] + c2[i] + c3[i];
+
+    result[gl_GlobalInvocationID.x] = sum;
+}

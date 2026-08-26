@@ -305,7 +305,27 @@ this card and has not been touched here.
 
 ## What has been measured
 
-Nothing yet. `main` proves the SDK works and does not measure the card.
+`main` proves the SDK works and does not measure the card. This branch,
+`cooperative-matrix`, does — see
+[`projects/cooperative-matrix/NOTES.md`](projects/cooperative-matrix/NOTES.md).
+
+| instruction, no memory traffic | Vulkan | HIP, ROCm repo's `wmma` |
+| --- | ---: | ---: |
+| fp32 vector FMA | 13,765 GFLOP/s | 9,513 |
+| packed fp16 FMA | 21,404 GFLOP/s | 18,633 |
+| 16×16×16 cooperative matrix | **46,471 GFLOP/s** | 39,077 |
+
+| C = A·B, 2048³, fp16 in fp32 out | GFLOP/s | of the matrix ceiling |
+| --- | ---: | ---: |
+| scalar, one invocation per element | 972 | 2% |
+| cooperative matrix, one tile per subgroup | 5,079 | 11% |
+| cooperative matrix, 2×2 tiles per subgroup | **19,206** | **41%** |
+
+The matrix instruction is 3.4× this card's fp32 vector ceiling, and 19% faster
+through Vulkan than the same units were through HIP's WMMA intrinsic. A real
+GEMM with 2×2 register blocking beats the fp32 vector *ceiling* by 1.4×, with
+its answers checked against the processor.
+
 
 Two full runs are recorded. [`samples/first-run.txt`](samples/first-run.txt)
 is the SDK already on the machine; [`samples/cold-install.txt`](samples/cold-install.txt)

@@ -1,0 +1,36 @@
+#version 450
+#extension GL_EXT_shader_explicit_arithmetic_types_float16 : require
+#extension GL_EXT_shader_16bit_storage      : require
+
+// The same multiply written the obvious way: one invocation per element of C,
+// a loop over K, no tiling and no shared memory.
+//
+// It is here as the floor rather than as a rival. Every element of C re-reads
+// a whole row of A and a whole column of B from device memory, so what this
+// measures is mostly the cache. A tuned scalar GEMM would land somewhere
+// between this and the matrix one, and writing that is not this branch's job -
+// the pair of numbers is enough to say what the instruction is worth on work
+// that has to be fetched.
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+layout(std430, binding = 0) readonly  buffer BufA { float16_t A[]; };
+layout(std430, binding = 1) readonly  buffer BufB { float16_t B[]; };
+layout(std430, binding = 2) writeonly buffer BufC { float     C[]; };
+
+layout(push_constant) uniform Push { uint M, N, K; } pc;
+
+void main()
+{
+    uint row = gl_GlobalInvocationID.y;
+    uint col = gl_GlobalInvocationID.x;
+    if (row >= pc.M || col >= pc.N) return;
+
+    // Accumulated in fp32, like the matrix kernel's accumulator, so the two
+    // results are comparable to the same tolerance.
+    float sum = 0.0;
+    for (uint k = 0u; k < pc.K; ++k) {
+        sum += float(A[row * pc.K + k]) * float(B[k * pc.N + col]);
+    }
+    C[row * pc.N + col] = sum;
+}

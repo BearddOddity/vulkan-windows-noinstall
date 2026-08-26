@@ -439,10 +439,17 @@ slow card consistently.
 
 ## Measured so far
 
-Nothing. `main` proves the SDK works; it does not measure the card. There is
-no Vulkan equivalent of `card_report.ps1` here - bandwidth, the vector
-ceilings, subgroup throughput and the cooperative-matrix rate against the same
-processor are all unwritten. Do not let this file imply otherwise.
+`main` still measures nothing, and that is deliberate - it proves the SDK works
+and has no opinion about the card. Bandwidth and a full `card_report.ps1`
+equivalent remain unwritten.
+
+The `cooperative-matrix` branch measures the instruction ceilings and one real
+GEMM: 46,471 GFLOP/s for the 16x16x16 matrix multiply-add, 3.4x this card's
+fp32 vector ceiling and 19% above what the same units gave through HIP. Its
+working notes are `projects/cooperative-matrix/NOTES.md` and they are the place
+to read before adding to it - particularly the clock warm-up, without which the
+first version of that harness reported two figures for the same kernel that
+differed by a factor of two.
 
 What is proven, on 2026-08-25:
 

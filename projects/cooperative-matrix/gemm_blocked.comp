@@ -1,0 +1,59 @@
+#version 450
+#extension GL_KHR_cooperative_matrix        : require
+#extension GL_KHR_memory_scope_semantics    : require
+#extension GL_KHR_shader_subgroup_basic     : require
+#extension GL_EXT_shader_explicit_arithmetic_types_float16 : require
+#extension GL_EXT_shader_16bit_storage      : require
+
+// The same multiply with one change: each subgroup owns a 32x32 patch of C
+// instead of a 16x16 one, held as four accumulators.
+//
+// The point is the ratio of loads to arithmetic. gemm_coopmat.comp does one
+// coopMatMulAdd for every two coopMatLoads. This does four for every four -
+// each A tile is used by two accumulators and each B tile by the other two -
+// so the same arithmetic arrives with half the traffic. Nothing else differs:
+// same instruction, same shape, still no shared memory, still every operand
+// straight from device memory.
+//
+// If the gap between the GEMM and the ceiling next door is memory rather than
+// the instruction, this is where it shows.
+
+layout(local_size_x = 128) in;
+
+layout(std430, binding = 0) readonly  buffer BufA { float16_t A[]; };
+layout(std430, binding = 1) readonly  buffer BufB { float16_t B[]; };
+layout(std430, binding = 2) writeonly buffer BufC { float     C[]; };
+
+layout(push_constant) uniform Push { uint M, N, K; } pc;
+
+void main()
+{
+    uint patchN = (gl_WorkGroupID.x * gl_NumSubgroups + gl_SubgroupID) * 32u;
+    uint patchM = gl_WorkGroupID.y * 32u;
+
+    coopmat<float, gl_ScopeSubgroup, 16, 16, gl_MatrixUseAccumulator> c00 =
+        coopmat<float, gl_ScopeSubgroup, 16, 16, gl_MatrixUseAccumulator>(0.0);
+    coopmat<float, gl_ScopeSubgroup, 16, 16, gl_MatrixUseAccumulator> c01 = c00;
+    coopmat<float, gl_ScopeSubgroup, 16, 16, gl_MatrixUseAccumulator> c10 = c00;
+    coopmat<float, gl_ScopeSubgroup, 16, 16, gl_MatrixUseAccumulator> c11 = c00;
+
+    for (uint k = 0u; k < pc.K; k += 16u) {
+        coopmat<float16_t, gl_ScopeSubgroup, 16, 16, gl_MatrixUseA> a0, a1;
+        coopmat<float16_t, gl_ScopeSubgroup, 16, 16, gl_MatrixUseB> b0, b1;
+
+        coopMatLoad(a0, A, (patchM       ) * pc.K + k, pc.K, gl_CooperativeMatrixLayoutRowMajor);
+        coopMatLoad(a1, A, (patchM + 16u ) * pc.K + k, pc.K, gl_CooperativeMatrixLayoutRowMajor);
+        coopMatLoad(b0, B, k * pc.N + patchN,          pc.N, gl_CooperativeMatrixLayoutRowMajor);
+        coopMatLoad(b1, B, k * pc.N + patchN + 16u,    pc.N, gl_CooperativeMatrixLayoutRowMajor);
+
+        c00 = coopMatMulAdd(a0, b0, c00);
+        c01 = coopMatMulAdd(a0, b1, c01);
+        c10 = coopMatMulAdd(a1, b0, c10);
+        c11 = coopMatMulAdd(a1, b1, c11);
+    }
+
+    coopMatStore(c00, C, (patchM      ) * pc.N + patchN,       pc.N, gl_CooperativeMatrixLayoutRowMajor);
+    coopMatStore(c01, C, (patchM      ) * pc.N + patchN + 16u, pc.N, gl_CooperativeMatrixLayoutRowMajor);
+    coopMatStore(c10, C, (patchM + 16u) * pc.N + patchN,       pc.N, gl_CooperativeMatrixLayoutRowMajor);
+    coopMatStore(c11, C, (patchM + 16u) * pc.N + patchN + 16u, pc.N, gl_CooperativeMatrixLayoutRowMajor);
+}
