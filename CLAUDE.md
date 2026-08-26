@@ -25,7 +25,11 @@ scripts\smoke_test.ps1
 get a shell with the SDK and MSVC on it.
 
 `main` builds nothing. Anything built on top belongs on a branch, as in the
-ROCm repository.
+ROCm repository:
+
+| branch | what it builds | measured |
+| --- | --- | --- |
+| `cooperative-matrix` | the matrix units through `VK_KHR_cooperative_matrix`, and a GEMM on top of them | 46,471 GFLOP/s for the instruction, 3.4x the fp32 vector ceiling; 19,206 GFLOP/s for a 2x2 blocked GEMM, 41% of it |
 
 ---
 
@@ -439,10 +443,14 @@ slow card consistently.
 
 ## Measured so far
 
-Nothing. `main` proves the SDK works; it does not measure the card. There is
-no Vulkan equivalent of `card_report.ps1` here - bandwidth, the vector
-ceilings, subgroup throughput and the cooperative-matrix rate against the same
-processor are all unwritten. Do not let this file imply otherwise.
+On `main`, nothing, and that is deliberate: it proves the SDK works and has no
+opinion about the card. There is still no Vulkan equivalent of
+`card_report.ps1` - bandwidth against the processor, and a single report that
+covers the card rather than one instruction, are both unwritten.
+
+The instruction ceilings and one GEMM are measured on the `cooperative-matrix`
+branch; see the table above and that branch's `projects/cooperative-matrix/NOTES.md`.
+Do not let this file imply anything beyond that has been measured.
 
 What is proven, on 2026-08-25:
 

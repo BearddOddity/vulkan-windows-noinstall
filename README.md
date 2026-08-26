@@ -28,6 +28,7 @@ transcript, failures included, is in
 - [What verify.ps1 checks, and what a failure means](#what-verifyps1-checks-and-what-a-failure-means)
 - [What the smoke test proves](#what-the-smoke-test-proves)
 - [The card, as the SDK reports it](#the-card-as-the-sdk-reports-it)
+- [Branches](#branches)
 - [What has been measured](#what-has-been-measured)
 - [Error messages, and what they actually mean](#error-messages-and-what-they-actually-mean)
 
@@ -303,9 +304,20 @@ the ROCm repository's WMMA branch, which measured those units at 39.1 TFLOP/s,
 4.1x the fp32 vector ceiling. The Vulkan route to the same silicon exists on
 this card and has not been touched here.
 
+## Branches
+
+`main` carries the toolchain and nothing else. Everything built on top lives on
+a branch, each branched from `main`:
+
+| branch | what it does | found |
+| --- | --- | --- |
+| `cooperative-matrix` | measures `VK_KHR_cooperative_matrix` against the vector units, and a real GEMM against the instruction's ceiling | the matrix instruction is **46,471 GFLOP/s**, 3.4x this card's fp32 vector ceiling and 19% above what the same units gave through HIP's WMMA intrinsic |
+
+Its working notes are `projects/cooperative-matrix/NOTES.md` on that branch.
+
 ## What has been measured
 
-Nothing yet. `main` proves the SDK works and does not measure the card.
+On `main`, nothing. It proves the SDK works and does not measure the card.
 
 Two full runs are recorded. [`samples/first-run.txt`](samples/first-run.txt)
 is the SDK already on the machine; [`samples/cold-install.txt`](samples/cold-install.txt)
